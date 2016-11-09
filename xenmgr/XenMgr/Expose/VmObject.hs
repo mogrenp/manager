@@ -324,7 +324,12 @@ implementationFor xm uuid = self where
   , comCitrixXenclientXenmgrVmUnrestrictedSetDomstoreWriteAccess = setDomstoreWriteAccess uuid
   , comCitrixXenclientXenmgrVmUnrestrictedGetDomstoreWriteAccess = getDomstoreWriteAccess uuid
 
-    -- bucketload of properties -- restricted version
+  , comCitrixXenclientXenmgrVmUnrestrictedGetDiskBackend = getVmDiskBackend uuid
+  , comCitrixXenclientXenmgrVmUnrestrictedSetDiskBackend = \v -> setVmDiskBackend uuid v
+  , comCitrixXenclientXenmgrVmGetDiskBackend = getVmDiskBackend uuid
+  , comCitrixXenclientXenmgrVmSetDiskBackend = \v -> restrict >> setVmDiskBackend uuid v  
+
+-- bucketload of properties -- restricted version
     -------------------------------------------------
   , comCitrixXenclientXenmgrVmGetState = runvm _state_str
   , comCitrixXenclientXenmgrVmGetAcpiState = fromIntegral <$> getVmAcpiState uuid
