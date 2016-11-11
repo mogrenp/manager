@@ -125,11 +125,12 @@ _SetBackendUuid _ _ =
     error "not implemented"
 
 _GetBackendName :: ID -> Rpc String
-_GetBackendName _ = return ""
+_GetBackendName id = fromMaybe "" . fmap show  <$> _get_field id diskBackendName
 
 _SetBackendName :: ID -> String -> Vm ()
-_SetBackendName _ _ =
-    error "not implemented"
+_SetBackendName id bname = _modify_disk id $ \d -> d { diskBackendName = case bname of
+                                                                           "" -> Nothing
+                                                                           _  -> Just bname }
 
 _GetPhysPath :: ID -> Rpc (String)
 _GetPhysPath id = _get_field id diskPath
