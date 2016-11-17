@@ -173,11 +173,8 @@ pause uuid =
 unpause :: Uuid -> IO ()
 unpause uuid = do
     domid <- getDomainId uuid
-    case domid of
-        "" -> return ()
-        _  -> do
-                exitCode <- system ("xl unpause " ++ domid)
-                bailIfError exitCode "error unpausing domain"
+    exitCode <- system ("xl unpause " ++ domid)
+    bailIfError exitCode "error unpausing domain"
 
 --It should be noted that by design, we start our domains paused to ensure all the
 --backend components are created and xenstore nodes are written before the domain

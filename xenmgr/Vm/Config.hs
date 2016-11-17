@@ -215,6 +215,7 @@ instance Marshall Disk where
                   sha1Sum <- dbRead (x ++ "/sha1sum" )
                   shared  <- dbReadWithDefault False (x ++ "/shared")
                   enable  <- dbReadWithDefault True (x ++ "/enable")
+                  bname   <- dbRead (x ++ "/backend-name")
                   return $
                          Disk { diskPath         = path
                               , diskType         = typ
@@ -226,6 +227,7 @@ instance Marshall Disk where
                               , diskShared       = shared
                               , diskManagedType  = mtyp
                               , diskEnabled      = enable
+                              , diskBackendName  = bname
                               }
     dbWrite x v = do current <- dbRead x
                      dbWrite (x ++ "/path"    ) (diskPath         v)
@@ -240,6 +242,7 @@ instance Marshall Disk where
                      dbWrite (x ++ "/shared" ) (diskShared v)
                      when (diskEnabled v /= diskEnabled current) $ 
                        dbWrite (x ++ "/enable") (diskEnabled v)
+                     dbWrite (x ++ "/backend-name") (diskBackendName v)
 
 -- NIC definition can be marshalled
 instance Marshall NicDef where
@@ -589,8 +592,8 @@ diskSpecs cfg = do
 diskSpec :: Uuid -> Disk -> Rpc DiskSpec
 diskSpec uuid d  = do
   stubdom <- readConfigPropertyDef uuid vmStubdom False
-  return $ printf "'%s,%s,%s,%s,%s,%s'"
-             (diskPath d) (fileToRaw (enumMarshall $ diskType d)) (cdType stubdom d) (diskDevice d) (enumMarshall $ diskMode d) (if ((enumMarshall $ diskDeviceType d) == "cdrom") then (enumMarshall $ diskDeviceType d) else "")
+  return $ printf "'%s,%s,%s,%s,%s,backend=%s,%s'"
+             (diskPath d) (fileToRaw (enumMarshall $ diskType d)) (cdType stubdom d) (diskDevice d) (enumMarshall $ diskMode d) (fromMaybe "0" (diskBackendName d)) (if ((enumMarshall $ diskDeviceType d) == "cdrom") then (enumMarshall $ diskDeviceType d) else "")
   where
     cdType stubdom d =
       case (enumMarshall $ diskDeviceType d) of
@@ -714,9 +717,9 @@ miscSpecs cfg = do
               -- no cdrom
               (False, _)    -> ""
               -- full access to cdrom
-              (True, True)  -> printf "file=%s:%s,media=cdrom,if=atapi-pt,format=atapi-pt-fmt,readonly=%s" atapiType bsg_str "off"
+              (True, True)  -> printf "file=%s:%s,media=cdrom,if=atapi-pt,format=raw,readonly=%s" atapiType bsg_str "off"
               -- readonly access to cdrom
-              (True, False) -> printf "file=%s:%s,media=cdrom,if=atapi-pt,format=atapi-pt-fmt,readonly=%s" atapiType bsg_str "on"
+              (True, False) -> printf "file=%s:%s,media=cdrom,if=atapi-pt,format=raw,readonly=%s" atapiType bsg_str "on"
         atapiType = if (vmcfgStubdom cfg) then "atapi-pt-v4v" else "atapi-pt-local"
 
     let empty = pure []
