@@ -338,7 +338,9 @@ getVmStartupDisks uuid = do
            , diskSnapshotMode = Nothing
            , diskSha1Sum = Nothing
            , diskShared = False
-           , diskManagedType = UnmanagedDisk }
+           , diskManagedType = UnmanagedDisk 
+           , diskBackendName = Nothing 
+           }
       
 getVms :: (MonadRpc e m) => m [Uuid]
 getVms = correctVms

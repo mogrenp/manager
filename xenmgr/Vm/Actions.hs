@@ -1109,6 +1109,7 @@ switchVm :: MonadRpc e m => Uuid -> m Bool
 switchVm uuid = whenDomainID False uuid $ \domid -> do
     debug $ "Attempting to switch screen to domain " ++ show uuid
     -- ensure switcher is ready
+    --liftIO $ waitForSwitcher domid
     liftIO $ Xl.wakeIfS3 uuid
     success <- inputSwitchFocus domid
     when (not success) $ warn ("switchVm: failed for uuid " ++ show uuid)
@@ -1281,6 +1282,7 @@ addDefaultDiskToVm uuid =
                      , diskManagedType = UnmanagedDisk
                      , diskShared = False
                      , diskEnabled = True
+                     , diskBackendName = Nothing
                      }
 
 --
@@ -1298,6 +1300,7 @@ addVhdDiskToVm uuid path = do
                , diskManagedType = UnmanagedDisk
                , diskShared = False
                , diskEnabled = True
+               , diskBackendName = Nothing
                }
     addDiskToVm uuid disk
 
@@ -1316,6 +1319,7 @@ addPhyDiskToVm uuid path = do
                , diskManagedType = UnmanagedDisk
                , diskShared = False
                , diskEnabled = True
+               , diskBackendName = Nothing
                }
     addDiskToVm uuid disk
 
