@@ -338,7 +338,9 @@ getVmStartupDisks uuid = do
            , diskSnapshotMode = Nothing
            , diskSha1Sum = Nothing
            , diskShared = False
-           , diskManagedType = UnmanagedDisk }
+           , diskManagedType = UnmanagedDisk 
+           , diskBackendName = Nothing 
+           }
       
 getVms :: (MonadRpc e m) => m [Uuid]
 getVms = correctVms
@@ -379,6 +381,16 @@ getAvailableVmNetworks nics
          let nic_networks = map nicdefNetwork (filter nicdefEnable nics)
          catMaybes <$> (mapM statNetwork $ intersect all_networks nic_networks)
 
+getVmDiskBackendUuid :: Disk -> Rpc (Maybe Uuid)
+getVmDiskBackendUuid disk =
+     case diskBackendName disk of
+          Nothing   -> return Nothing
+          Just name ->
+            do vms <- getVmsBy (\vm -> (== name) <$> getVmName vm)
+               case vms of
+                 (uuid:_) -> return $ Just uuid
+                 _        -> return Nothing
+
 getDependencyGraph :: Rpc (DepGraph Uuid)
 getDependencyGraph =
     do vms <- getVms
@@ -387,8 +399,10 @@ getDependencyGraph =
     where
       edge uuid =
           do nics <- getVmNicDefs' uuid
+             disks <- M.elems <$> getDisks uuid 
              net_backends <- nub . catMaybes <$> mapM getVmNicBackendUuid nics
-             return $ map (\dep -> (uuid,dep)) net_backends
+             disk_backends <- nub . catMaybes <$> mapM getVmDiskBackendUuid disks
+             return $ map (\dep -> (uuid,dep)) (net_backends ++ disk_backends)
 
 getVmDependencies :: Uuid -> Rpc [Uuid]
 getVmDependencies uuid =
