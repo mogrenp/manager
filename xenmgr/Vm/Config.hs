@@ -574,9 +574,12 @@ validDisks = filterM isDiskValid . allDisks
 
 isDiskValid :: Disk -> Rpc Bool
 isDiskValid disk =
-    case diskType disk of
-      VirtualHardDisk -> liftIO . doesFileExist $ diskPath disk
-      _               -> return True
+      case diskBackendName disk of
+        Nothing -> do
+          case diskType disk of
+            VirtualHardDisk -> liftIO . doesFileExist $ diskPath disk
+            _               -> return True
+        _       -> return True
 
 --build an xl config style disk list
 diskSpecs :: VmConfig -> Rpc [DiskSpec]
