@@ -1281,6 +1281,7 @@ addDefaultDiskToVm uuid =
                      , diskManagedType = UnmanagedDisk
                      , diskShared = False
                      , diskEnabled = True
+                     , diskBackendName = Nothing
                      }
 
 --
@@ -1298,6 +1299,7 @@ addVhdDiskToVm uuid path = do
                , diskManagedType = UnmanagedDisk
                , diskShared = False
                , diskEnabled = True
+               , diskBackendName = Nothing
                }
     addDiskToVm uuid disk
 
@@ -1316,6 +1318,7 @@ addPhyDiskToVm uuid path = do
                , diskManagedType = UnmanagedDisk
                , diskShared = False
                , diskEnabled = True
+               , diskBackendName = Nothing
                }
     addDiskToVm uuid disk
 
