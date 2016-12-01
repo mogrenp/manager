@@ -80,7 +80,7 @@ module Vm.Actions
           , setVmVideoram, setVmPassthroughMmio, setVmPassthroughIo, setVmFlaskLabel
           , setVmAmtPt, setVmHap, setVmSmbios, setVmDescription
           , setVmExtraXenvm, setVmExtraHvm
-          , setVmStartOnBootPriority, setVmKeepAlive, setVmProvidesNetworkBackend
+          , setVmStartOnBootPriority, setVmKeepAlive, setVmProvidesNetworkBackend, setVmProvidesDiskBackend 
           , setVmProvidesGraphicsFallback, setVmShutdownPriority, setVmSeamlessId
           , setVmStartFromSuspendImage, setVmQemuDmPath, setVmQemuDmTimeout, setVmTrackDependencies
           , setVmSeamlessMouseLeft, setVmSeamlessMouseRight, setVmOs, setVmControlPlatformPowerState
@@ -103,6 +103,7 @@ module Vm.Actions
           , setVmDownloadProgress
           , setVmReady
           , setVmProvidesDefaultNetworkBackend
+          , setVmProvidesDefaultDiskBackend
           , setVmVkbd
           , setVmVfb
           , setVmV4V
@@ -583,25 +584,54 @@ startupMeasureVm uuid
 
 startupDependencies :: Uuid -> XM Bool
 startupDependencies uuid
-  = do deps <- liftRpc $ getVmTrackDependencies uuid
-       if deps
+  = do startDiskDependencies uuid
+       checkDiskDependencies uuid
+       net_deps <- liftRpc $ getVmTrackDependencies uuid
+       if net_deps
          then do
-           startDependencies uuid
-           checkDependencies uuid
+           startNetworkDependencies uuid
+           checkNetworkDependencies uuid
          else do
            return True
   where
-    checkDependencies uuid = liftRpc $ do
-        missing <- filterM (fmap not . isRunning) =<< (getVmDependencies uuid)
-        if (null missing)
-            then do return True
-            else do warn $ "missing dependencies: " ++ show missing
+    startDiskDependencies uuid =
+        do dependentVms <- liftRpc $ getVmDiskDependencies uuid
+           unless (null dependentVms) $ 
+                info $ "vm disk dependencies: " ++ show dependentVms
+           mapM_ startVm =<< (liftRpc $ filterM (fmap not .isRunning) dependentVms)
+
+    checkDiskDependencies uuid = do
+       dependentVms <- liftRpc $ getVmDiskDependencies uuid
+       if (null dependentVms)
+          then return True
+          else do
+             missing <- filterM (fmap not . isRunning) dependentVms
+             when (null missing) $ warn ("missing disk dependencies: " ++ show missing)
+             running <- filterM isRunning dependentVms
+             mapM waitForDiskDependencies running
+             return True
+ 
+    waitForDiskDependencies uuid = do
+       domid <- fromMaybe (-1) <$> getDomainID uuid
+       ready <- liftIO $ xsRead ("/local/domain/" ++ show domid ++ "/device/storage-ready")
+       case fromMaybe "-1" ready of
+          "1" -> return True
+          "0" -> do liftIO (threadDelay $ 10^6)
+                    waitForDiskDependencies uuid
+          _   -> do error ("Cannot find appropriate xenstore value for disk backend: " ++ show uuid)
                     return False
 
-    startDependencies uuid =
-        do dependentVms <- liftRpc $ getVmDependencies uuid
+    checkNetworkDependencies uuid = liftRpc $ do
+       missing <- filterM (fmap not . isRunning) =<< (getVmNetworkDependencies uuid)
+       if (null missing)
+            then do return True
+            else do warn $ "missing network dependencies: " ++ show missing
+                    return False
+
+    startNetworkDependencies uuid =
+        do dependentVms <- liftRpc $ getVmNetworkDependencies uuid
            unless (null dependentVms) $
-                info $ "vm dependencies: " ++ show dependentVms
+                info $ "vm network dependencies: " ++ show dependentVms
            mapM_ startVm =<< (liftRpc $ filterM (fmap not . isRunning) dependentVms)
 
 startupExtractKernel :: Uuid -> XM Bool
@@ -876,6 +906,12 @@ bootVm config
 
           --setupBiosStrings uuid
           setupAcpiNode uuid
+
+          gives_storage <- getVmProvidesDiskBackend uuid
+          when gives_storage $ whenDomainID_ uuid $ \domid -> do
+            liftIO $ xsWrite (domainXSPath domid ++ "/device/storage-ready") "0"
+            liftIO $ xsChmod (domainXSPath domid ++ "/device/storage-ready") ("b" ++ show domid ++ ",r0")
+
           -- some little network plumbing
           gives_network <- getVmProvidesNetworkBackend uuid
           when gives_network $ whenDomainID_ uuid $ \domid -> do
@@ -1281,6 +1317,9 @@ addDefaultDiskToVm uuid =
                      , diskManagedType = UnmanagedDisk
                      , diskShared = False
                      , diskEnabled = True
+                     , diskBackendName = Nothing
+                     , diskBackendUuid = Nothing
+                     , diskBackendDomid = Nothing
                      }
 
 --
@@ -1298,6 +1337,9 @@ addVhdDiskToVm uuid path = do
                , diskManagedType = UnmanagedDisk
                , diskShared = False
                , diskEnabled = True
+               , diskBackendName = Nothing
+               , diskBackendUuid = Nothing
+               , diskBackendDomid = Nothing
                }
     addDiskToVm uuid disk
 
@@ -1316,6 +1358,9 @@ addPhyDiskToVm uuid path = do
                , diskManagedType = UnmanagedDisk
                , diskShared = False
                , diskEnabled = True
+               , diskBackendName = Nothing
+               , diskBackendUuid = Nothing
+               , diskBackendDomid = Nothing
                }
     addDiskToVm uuid disk
 
@@ -1742,6 +1787,8 @@ setVmSmbios uuid v = saveConfigProperty uuid vmSmbios (v::String)
 setVmDescription uuid v = saveConfigProperty uuid vmDescription (v::String)
 setVmStartOnBootPriority uuid v = saveConfigProperty uuid vmStartOnBootPriority (v::Int)
 setVmKeepAlive uuid v = saveConfigProperty uuid vmKeepAlive (v::Bool)
+setVmProvidesDiskBackend uuid v = saveConfigProperty uuid vmProvidesDiskBackend (v::Bool)
+setVmProvidesDefaultDiskBackend uuid v = saveConfigProperty uuid vmProvidesDefaultDiskBackend (v::Bool)
 setVmProvidesNetworkBackend uuid v = saveConfigProperty uuid vmProvidesNetworkBackend (v::Bool)
 setVmProvidesDefaultNetworkBackend uuid v = saveConfigProperty uuid vmProvidesDefaultNetworkBackend (v::Bool)
 setVmProvidesGraphicsFallback uuid v = saveConfigProperty uuid vmProvidesGraphicsFallback (v::Bool)
