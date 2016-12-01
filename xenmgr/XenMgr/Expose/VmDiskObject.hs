@@ -118,18 +118,20 @@ _Delete (ID vm_uuid disk_id) =
        liftRpc $ unexpose vm_uuid disk_id
 
 _GetBackendUuid :: ID -> Rpc String
-_GetBackendUuid _ = return ""
+_GetBackendUuid id = fromMaybe "" . fmap show  <$> _get_field id diskBackendUuid
 
 _SetBackendUuid :: ID -> String -> Vm ()
-_SetBackendUuid _ _ =
-    error "not implemented"
+_SetBackendUuid id uuid = _modify_disk id $ \d -> d { diskBackendName = case uuid of
+                                                                         "" -> Nothing
+                                                                         _  -> Just uuid }
 
 _GetBackendName :: ID -> Rpc String
-_GetBackendName _ = return ""
+_GetBackendName id = fromMaybe "" . fmap show  <$> _get_field id diskBackendName
 
 _SetBackendName :: ID -> String -> Vm ()
-_SetBackendName _ _ =
-    error "not implemented"
+_SetBackendName id bname = _modify_disk id $ \d -> d { diskBackendName = case bname of
+                                                                           "" -> Nothing
+                                                                           _  -> Just bname }
 
 _GetPhysPath :: ID -> Rpc (String)
 _GetPhysPath id = _get_field id diskPath

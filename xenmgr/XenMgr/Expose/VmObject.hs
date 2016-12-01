@@ -239,6 +239,9 @@ implementationFor xm uuid = self where
   , comCitrixXenclientXenmgrVmUnrestrictedSetKeepAlive = setVmKeepAlive uuid
   , comCitrixXenclientXenmgrVmUnrestrictedGetProvidesNetworkBackend = getVmProvidesNetworkBackend uuid
   , comCitrixXenclientXenmgrVmUnrestrictedSetProvidesNetworkBackend = setVmProvidesNetworkBackend uuid
+  , comCitrixXenclientXenmgrVmUnrestrictedGetProvidesDiskBackend = getVmProvidesDiskBackend uuid
+  , comCitrixXenclientXenmgrVmUnrestrictedSetProvidesDiskBackend = setVmProvidesDiskBackend uuid
+  
   , comCitrixXenclientXenmgrVmUnrestrictedGetMeasured = getVmMeasured uuid
   , comCitrixXenclientXenmgrVmUnrestrictedGetProvidesGraphicsFallback = getVmProvidesGraphicsFallback uuid
   , comCitrixXenclientXenmgrVmUnrestrictedSetProvidesGraphicsFallback = \v -> setVmProvidesGraphicsFallback uuid v
@@ -442,6 +445,8 @@ implementationFor xm uuid = self where
   , comCitrixXenclientXenmgrVmSetKeepAlive = \v -> restrict >> setVmKeepAlive uuid v
   , comCitrixXenclientXenmgrVmGetProvidesNetworkBackend = getVmProvidesNetworkBackend uuid
   , comCitrixXenclientXenmgrVmSetProvidesNetworkBackend = \v -> restrict >> setVmProvidesNetworkBackend uuid v
+  , comCitrixXenclientXenmgrVmGetProvidesDiskBackend = getVmProvidesDiskBackend uuid
+  , comCitrixXenclientXenmgrVmSetProvidesDiskBackend = \v -> restrict >> setVmProvidesDiskBackend uuid v
   , comCitrixXenclientXenmgrVmGetExtraXenvm = getVmExtraXenvm uuid
   , comCitrixXenclientXenmgrVmSetExtraXenvm = \v -> restrict >> setVmExtraXenvm uuid v
   , comCitrixXenclientXenmgrVmGetExtraHvm = getVmExtraHvm uuid
@@ -589,6 +594,11 @@ implementationFor xm uuid = self where
   , comCitrixXenclientXenmgrVmUnrestrictedGetDownloadProgress = fromIntegral <$> getVmDownloadProgress uuid
   , comCitrixXenclientXenmgrVmSetDownloadProgress = restrict' $ (setVmDownloadProgress uuid . fromIntegral)
   , comCitrixXenclientXenmgrVmUnrestrictedSetDownloadProgress = setVmDownloadProgress uuid . fromIntegral
+
+  , comCitrixXenclientXenmgrVmGetProvidesDefaultDiskBackend = getVmProvidesDefaultDiskBackend uuid
+  , comCitrixXenclientXenmgrVmUnrestrictedGetProvidesDefaultDiskBackend = getVmProvidesDefaultDiskBackend uuid
+  , comCitrixXenclientXenmgrVmSetProvidesDefaultDiskBackend = restrict' $ setVmProvidesDefaultDiskBackend uuid
+  , comCitrixXenclientXenmgrVmUnrestrictedSetProvidesDefaultDiskBackend = setVmProvidesDefaultDiskBackend uuid
 
   , comCitrixXenclientXenmgrVmGetProvidesDefaultNetworkBackend = getVmProvidesDefaultNetworkBackend uuid
   , comCitrixXenclientXenmgrVmUnrestrictedGetProvidesDefaultNetworkBackend = getVmProvidesDefaultNetworkBackend uuid
