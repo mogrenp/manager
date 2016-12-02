@@ -84,7 +84,7 @@ module Vm.Queries
                , getVmVideoram, getVmPassthroughMmio, getVmPassthroughIo, getVmFlaskLabel
                , getVmAcpiState, getVmHap, getVmSmbios, getVmDescription, getVmMeasured
                , getVmExtraXenvm, getVmExtraHvm
-               , getVmStartOnBootPriority, getVmKeepAlive, getVmProvidesNetworkBackend
+               , getVmStartOnBootPriority, getVmKeepAlive, getVmProvidesNetworkBackend, getVmProvidesDiskBackend
                , getVmShutdownPriority, getVmProvidesGraphicsFallback
                , getVmSeamlessId, getVmStartFromSuspendImage
                , getVmQemuDmPath, getVmQemuDmTimeout
@@ -973,6 +973,7 @@ getVmSmbios uuid = readConfigPropertyDef uuid vmSmbios ""
 getVmDescription uuid = readConfigPropertyDef uuid vmDescription ""
 getVmStartOnBootPriority uuid = readConfigPropertyDef uuid vmStartOnBootPriority (0::Int)
 getVmKeepAlive uuid = readConfigPropertyDef uuid vmKeepAlive False
+getVmProvidesDiskBackend uuid = readConfigPropertyDef uuid vmProvidesDiskBackend False
 getVmProvidesNetworkBackend uuid = readConfigPropertyDef uuid vmProvidesNetworkBackend False
 getVmProvidesDefaultNetworkBackend uuid = readConfigPropertyDef uuid vmProvidesDefaultNetworkBackend False
 getVmMeasured uuid = readConfigPropertyDef uuid vmMeasured False
