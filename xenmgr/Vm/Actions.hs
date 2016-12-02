@@ -80,7 +80,7 @@ module Vm.Actions
           , setVmVideoram, setVmPassthroughMmio, setVmPassthroughIo, setVmFlaskLabel
           , setVmAmtPt, setVmHap, setVmSmbios, setVmDescription
           , setVmExtraXenvm, setVmExtraHvm
-          , setVmStartOnBootPriority, setVmKeepAlive, setVmProvidesNetworkBackend
+          , setVmStartOnBootPriority, setVmKeepAlive, setVmProvidesNetworkBackend, setVmProvidesDiskBackend 
           , setVmProvidesGraphicsFallback, setVmShutdownPriority, setVmSeamlessId
           , setVmStartFromSuspendImage, setVmQemuDmPath, setVmQemuDmTimeout, setVmTrackDependencies
           , setVmSeamlessMouseLeft, setVmSeamlessMouseRight, setVmOs, setVmControlPlatformPowerState
@@ -1745,6 +1745,7 @@ setVmDescription uuid v = saveConfigProperty uuid vmDescription (v::String)
 setVmStartOnBootPriority uuid v = saveConfigProperty uuid vmStartOnBootPriority (v::Int)
 setVmKeepAlive uuid v = saveConfigProperty uuid vmKeepAlive (v::Bool)
 setVmProvidesNetworkBackend uuid v = saveConfigProperty uuid vmProvidesNetworkBackend (v::Bool)
+setVmProvidesDiskBackend uuid v = saveConfigProperty uuid vmProvidesDiskBackend (v::Bool)
 setVmProvidesDefaultNetworkBackend uuid v = saveConfigProperty uuid vmProvidesDefaultNetworkBackend (v::Bool)
 setVmProvidesGraphicsFallback uuid v = saveConfigProperty uuid vmProvidesGraphicsFallback (v::Bool)
 setVmShutdownPriority uuid v = saveConfigProperty uuid vmShutdownPriority (v::Int)

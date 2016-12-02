@@ -237,6 +237,11 @@ implementationFor xm uuid = self where
   , comCitrixXenclientXenmgrVmUnrestrictedSetKeepAlive = setVmKeepAlive uuid
   , comCitrixXenclientXenmgrVmUnrestrictedGetProvidesNetworkBackend = getVmProvidesNetworkBackend uuid
   , comCitrixXenclientXenmgrVmUnrestrictedSetProvidesNetworkBackend = setVmProvidesNetworkBackend uuid
+--Paul stuff--------------------------------------------------------------------------------------------------------------------------------------------------
+  , comCitrixXenclientXenmgrVmUnrestrictedGetProvidesDiskBackend = getVmProvidesDiskBackend uuid
+  , comCitrixXenclientXenmgrVmUnrestrictedSetProvidesDiskBackend = setVmProvidesDiskBackend uuid
+--------------------------------------------------------------------------------------------------------------------------------------------------------------
+  
   , comCitrixXenclientXenmgrVmUnrestrictedGetMeasured = getVmMeasured uuid
   , comCitrixXenclientXenmgrVmUnrestrictedGetProvidesGraphicsFallback = getVmProvidesGraphicsFallback uuid
   , comCitrixXenclientXenmgrVmUnrestrictedSetProvidesGraphicsFallback = \v -> setVmProvidesGraphicsFallback uuid v
@@ -438,6 +443,10 @@ implementationFor xm uuid = self where
   , comCitrixXenclientXenmgrVmSetKeepAlive = \v -> restrict >> setVmKeepAlive uuid v
   , comCitrixXenclientXenmgrVmGetProvidesNetworkBackend = getVmProvidesNetworkBackend uuid
   , comCitrixXenclientXenmgrVmSetProvidesNetworkBackend = \v -> restrict >> setVmProvidesNetworkBackend uuid v
+  --Paul stuff--------------------------------------------------------------------------------------------------------------------------------------------------
+  , comCitrixXenclientXenmgrVmGetProvidesDiskBackend = getVmProvidesDiskBackend uuid
+  , comCitrixXenclientXenmgrVmSetProvidesDiskBackend = \v -> restrict >> setVmProvidesDiskBackend uuid v
+  ------------------------------------------------------------------------------------------------------------------------------------------------------------
   , comCitrixXenclientXenmgrVmGetExtraXenvm = getVmExtraXenvm uuid
   , comCitrixXenclientXenmgrVmSetExtraXenvm = \v -> restrict >> setVmExtraXenvm uuid v
   , comCitrixXenclientXenmgrVmGetExtraHvm = getVmExtraHvm uuid

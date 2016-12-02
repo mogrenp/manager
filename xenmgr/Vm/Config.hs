@@ -38,7 +38,7 @@ module Vm.Config (
 
                   -- list of interesting config properties
                 , vmUuidP, vmName, vmDescription, vmType, vmSlot, vmImagePath, vmPvAddons, vmPvAddonsVersion
-                , vmStartOnBoot, vmStartOnBootPriority, vmKeepAlive, vmProvidesNetworkBackend, vmTimeOffset
+                , vmStartOnBoot, vmStartOnBootPriority, vmKeepAlive, vmProvidesNetworkBackend, vmProvidesDiskBackend, vmTimeOffset
                 , vmAmtPt, vmCryptoUser, vmCryptoKeyDirs, vmStartup
                 , vmNotify, vmHvm, vmPae, vmAcpi, vmApic, vmViridian, vmNx, vmSound, vmMemory, vmHap, vmSmbios
                 , vmDisplay, vmBoot, vmCmdLine, vmKernel, vmInitrd, vmAcpiPath, vmVcpus, vmGpu
@@ -350,6 +350,7 @@ vmStartFromSuspendImage = property "start-from-suspend-image"
 vmShutdownPriority = property "shutdown-priority"
 vmKeepAlive = property "keep-alive"
 vmProvidesNetworkBackend = property "provides-network-backend"
+vmProvidesDiskBackend = property "provides-disk-backend"
 vmProvidesDefaultNetworkBackend = property "provides-default-network-backend"
 vmProvidesGraphicsFallback = property "provides-graphics-fallback"
 vmTimeOffset = property "time-offset"
