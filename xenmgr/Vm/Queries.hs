@@ -88,7 +88,7 @@ module Vm.Queries
                , getVmShutdownPriority, getVmProvidesGraphicsFallback
                , getVmSeamlessId, getVmStartFromSuspendImage
                , getVmQemuDmPath, getVmQemuDmTimeout
-               , getVmDependencies
+               , getVmNetworkDependencies, getVmDiskDependencies, getVmDependencies
                , getVmTrackDependencies
                , getVmSeamlessMouseLeft, getVmSeamlessMouseRight
                , getVmOs, getVmControlPlatformPowerState, getVmGreedyPcibackBind
@@ -391,22 +391,58 @@ getVmDiskBackendUuid disk =
                  (uuid:_) -> return $ Just uuid
                  _        -> return Nothing
 
-getDependencyGraph :: Rpc (DepGraph Uuid)
-getDependencyGraph =
+getDiskDependencyGraph :: Rpc (DepGraph Uuid)
+getDiskDependencyGraph =
+    do vms <- getVms
+       edges <- concat <$> mapM edge vms
+       return $ depgraphFromEdges edges
+    where
+      edge uuid =
+          do disks <- M.elems <$> getDisks uuid
+             backends <- nub . catMaybes <$> mapM getVmDiskBackendUuid disks
+             return $ map (\dep -> (uuid,dep)) backends
+
+getVmDiskDependencies :: Uuid -> Rpc [Uuid]
+getVmDiskDependencies uuid =
+    do graph <- getDiskDependencyGraph
+       case dependencies uuid graph of
+         Nothing -> error "errors in dependency graph; check for cycles"
+         Just xs -> return xs
+
+getNetworkDependencyGraph :: Rpc (DepGraph Uuid)
+getNetworkDependencyGraph =
     do vms <- getVms
        edges <- concat <$> mapM edge vms
        return $ depgraphFromEdges edges
     where
       edge uuid =
           do nics <- getVmNicDefs' uuid
-             disks <- M.elems <$> getDisks uuid 
+             backends <- nub . catMaybes <$> mapM getVmNicBackendUuid nics
+             return $ map (\dep -> (uuid,dep)) backends
+
+getVmNetworkDependencies :: Uuid -> Rpc [Uuid]
+getVmNetworkDependencies uuid =
+    do graph <- getNetworkDependencyGraph
+       case dependencies uuid graph of
+         Nothing -> error "errors in dependency graph; check for cycles"
+         Just xs -> return xs
+
+getFullDependencyGraph :: Rpc (DepGraph Uuid)
+getFullDependencyGraph =
+    do vms <- getVms
+       edges <- concat <$> mapM edge vms
+       return $ depgraphFromEdges edges
+    where
+      edge uuid =
+          do nics <- getVmNicDefs' uuid
+             disks <- M.elems <$> getDisks uuid
              net_backends <- nub . catMaybes <$> mapM getVmNicBackendUuid nics
              disk_backends <- nub . catMaybes <$> mapM getVmDiskBackendUuid disks
              return $ map (\dep -> (uuid,dep)) (net_backends ++ disk_backends)
 
 getVmDependencies :: Uuid -> Rpc [Uuid]
 getVmDependencies uuid =
-    do graph <- getDependencyGraph
+    do graph <- getFullDependencyGraph
        case dependencies uuid graph of
          Nothing -> error "errors in dependency graph; check for cycles"
          Just xs -> return xs
