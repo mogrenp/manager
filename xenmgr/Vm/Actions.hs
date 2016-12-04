@@ -583,25 +583,53 @@ startupMeasureVm uuid
 
 startupDependencies :: Uuid -> XM Bool
 startupDependencies uuid
-  = do deps <- liftRpc $ getVmTrackDependencies uuid
-       if deps
+  = do startDiskDependencies uuid
+       checkDiskDependencies uuid
+       --waitForDiskDependencies uuid
+       net_deps <- liftRpc $ getVmTrackDependencies uuid
+       if net_deps
          then do
-           startDependencies uuid
-           checkDependencies uuid
+           startNetworkDependencies uuid
+           checkNetworkDependencies uuid
          else do
            return True
   where
-    checkDependencies uuid = liftRpc $ do
-        missing <- filterM (fmap not . isRunning) =<< (getVmDependencies uuid)
-        if (null missing)
+    startDiskDependencies uuid =
+        do dependentVms <- liftRpc $ getVmDiskDependencies uuid
+           unless (null dependentVms) $ 
+                info $ "vm disk dependencies: " ++ show dependentVms
+           mapM_ startVm =<< (liftRpc $ filterM (fmap not .isRunning) dependentVms)
+
+    checkDiskDependencies uuid = do
+      dependentVms <- liftRpc $ getVmDiskDependencies uuid
+      if (null dependentVms) 
+        then do
+           return True
+        else do
+           mapM_ waitForDiskDependencies dependentVms
+           return True
+
+    waitForDiskDependencies uuid = do
+           domid <- fromMaybe (-1) <$> getDomainID uuid
+           ready <- liftIO $ xsRead ("/local/domain/" ++ show domid ++ "/device/storage-ready")
+           case fromMaybe "-1" ready of
+              "1" -> return True
+              "0" -> do liftIO (threadDelay $ 10^6)
+                        waitForDiskDependencies uuid
+              _   -> do error ("Cannot find appropriate xenstore value for disk backend: " ++ show uuid)
+                        return False
+
+    checkNetworkDependencies uuid = liftRpc $ do
+       missing <- filterM (fmap not . isRunning) =<< (getVmNetworkDependencies uuid)
+       if (null missing)
             then do return True
-            else do warn $ "missing dependencies: " ++ show missing
+            else do warn $ "missing network dependencies: " ++ show missing
                     return False
 
-    startDependencies uuid =
-        do dependentVms <- liftRpc $ getVmDependencies uuid
+    startNetworkDependencies uuid =
+        do dependentVms <- liftRpc $ getVmNetworkDependencies uuid
            unless (null dependentVms) $
-                info $ "vm dependencies: " ++ show dependentVms
+                info $ "vm network dependencies: " ++ show dependentVms
            mapM_ startVm =<< (liftRpc $ filterM (fmap not . isRunning) dependentVms)
 
 startupExtractKernel :: Uuid -> XM Bool
@@ -876,6 +904,12 @@ bootVm config
 
           setupBiosStrings uuid
           setupAcpiNode uuid
+
+          gives_storage <- getVmProvidesDiskBackend uuid
+          when gives_storage $ whenDomainID_ uuid $ \domid -> do
+            liftIO $ xsWrite (domainXSPath domid ++ "/device/storage-ready") "0"
+            liftIO $ xsChmod (domainXSPath domid ++ "/device/storage-ready") ("b" ++ show domid ++ ",r0")
+
           -- some little network plumbing
           gives_network <- getVmProvidesNetworkBackend uuid
           when gives_network $ whenDomainID_ uuid $ \domid -> do
