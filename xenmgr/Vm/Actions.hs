@@ -103,6 +103,7 @@ module Vm.Actions
           , setVmDownloadProgress
           , setVmReady
           , setVmProvidesDefaultNetworkBackend
+          , setVmProvidesDefaultDiskBackend
           , setVmVkbd
           , setVmVfb
           , setVmV4V
@@ -601,11 +602,15 @@ startupDependencies uuid
 
     checkDiskDependencies uuid = do
        dependentVms <- liftRpc $ getVmDiskDependencies uuid
-       if (null dependentVms) 
-          then do return True
-          else do mapM waitForDiskDependencies dependentVms
-                  return True
-
+       if (null dependentVms)
+          then return True
+          else do
+             missing <- filterM (fmap not . isRunning) dependentVms
+             when (null missing) $ warn ("missing disk dependencies: " ++ show missing)
+             running <- filterM isRunning dependentVms
+             mapM waitForDiskDependencies running
+             return True
+ 
     waitForDiskDependencies uuid = do
        domid <- fromMaybe (-1) <$> getDomainID uuid
        ready <- liftIO $ xsRead ("/local/domain/" ++ show domid ++ "/device/storage-ready")
@@ -1313,6 +1318,8 @@ addDefaultDiskToVm uuid =
                      , diskShared = False
                      , diskEnabled = True
                      , diskBackendName = Nothing
+                     , diskBackendUuid = Nothing
+                     , diskBackendDomid = Nothing
                      }
 
 --
@@ -1331,6 +1338,8 @@ addVhdDiskToVm uuid path = do
                , diskShared = False
                , diskEnabled = True
                , diskBackendName = Nothing
+               , diskBackendUuid = Nothing
+               , diskBackendDomid = Nothing
                }
     addDiskToVm uuid disk
 
@@ -1350,6 +1359,8 @@ addPhyDiskToVm uuid path = do
                , diskShared = False
                , diskEnabled = True
                , diskBackendName = Nothing
+               , diskBackendUuid = Nothing
+               , diskBackendDomid = Nothing
                }
     addDiskToVm uuid disk
 
@@ -1776,8 +1787,9 @@ setVmSmbios uuid v = saveConfigProperty uuid vmSmbios (v::String)
 setVmDescription uuid v = saveConfigProperty uuid vmDescription (v::String)
 setVmStartOnBootPriority uuid v = saveConfigProperty uuid vmStartOnBootPriority (v::Int)
 setVmKeepAlive uuid v = saveConfigProperty uuid vmKeepAlive (v::Bool)
-setVmProvidesNetworkBackend uuid v = saveConfigProperty uuid vmProvidesNetworkBackend (v::Bool)
 setVmProvidesDiskBackend uuid v = saveConfigProperty uuid vmProvidesDiskBackend (v::Bool)
+setVmProvidesDefaultDiskBackend uuid v = saveConfigProperty uuid vmProvidesDefaultDiskBackend (v::Bool)
+setVmProvidesNetworkBackend uuid v = saveConfigProperty uuid vmProvidesNetworkBackend (v::Bool)
 setVmProvidesDefaultNetworkBackend uuid v = saveConfigProperty uuid vmProvidesDefaultNetworkBackend (v::Bool)
 setVmProvidesGraphicsFallback uuid v = saveConfigProperty uuid vmProvidesGraphicsFallback (v::Bool)
 setVmShutdownPriority uuid v = saveConfigProperty uuid vmShutdownPriority (v::Int)

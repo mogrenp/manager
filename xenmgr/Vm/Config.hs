@@ -71,6 +71,7 @@ module Vm.Config (
                 , vmIcbinnPath
                 , vmOvfTransportIso
                 , vmReady
+                , vmProvidesDefaultDiskBackend
                 , vmProvidesDefaultNetworkBackend
                 , vmRestrictDisplayDepth
                 , vmRestrictDisplayRes
@@ -216,6 +217,7 @@ instance Marshall Disk where
                   shared  <- dbReadWithDefault False (x ++ "/shared")
                   enable  <- dbReadWithDefault True (x ++ "/enable")
                   bname   <- dbRead (x ++ "/backend-name")
+                  uuid    <- dbRead (x ++ "/backend-uuid")
                   return $
                          Disk { diskPath         = path
                               , diskType         = typ
@@ -228,6 +230,8 @@ instance Marshall Disk where
                               , diskManagedType  = mtyp
                               , diskEnabled      = enable
                               , diskBackendName  = bname
+                              , diskBackendUuid  = uuid
+                              , diskBackendDomid = Nothing
                               }
     dbWrite x v = do current <- dbRead x
                      dbWrite (x ++ "/path"    ) (diskPath         v)
@@ -243,6 +247,7 @@ instance Marshall Disk where
                      when (diskEnabled v /= diskEnabled current) $ 
                        dbWrite (x ++ "/enable") (diskEnabled v)
                      dbWrite (x ++ "/backend-name") (diskBackendName v)
+                     dbWrite (x ++ "/backend-uuid") (diskBackendUuid v)
 
 -- NIC definition can be marshalled
 instance Marshall NicDef where
@@ -349,8 +354,9 @@ vmStartOnBootPriority = property "start_on_boot_priority"
 vmStartFromSuspendImage = property "start-from-suspend-image"
 vmShutdownPriority = property "shutdown-priority"
 vmKeepAlive = property "keep-alive"
-vmProvidesNetworkBackend = property "provides-network-backend"
 vmProvidesDiskBackend = property "provides-disk-backend"
+vmProvidesDefaultDiskBackend = property "provides-default-disk-backend"
+vmProvidesNetworkBackend = property "provides-network-backend"
 vmProvidesDefaultNetworkBackend = property "provides-default-network-backend"
 vmProvidesGraphicsFallback = property "provides-graphics-fallback"
 vmTimeOffset = property "time-offset"
@@ -575,12 +581,11 @@ validDisks = filterM isDiskValid . allDisks
 
 isDiskValid :: Disk -> Rpc Bool
 isDiskValid disk =
-      case diskBackendName disk of
-        Nothing -> do
-          case diskType disk of
-            VirtualHardDisk -> liftIO . doesFileExist $ diskPath disk
-            _               -> return True
-        _       -> return True
+  case diskBackendDomid disk of
+     Nothing -> case diskType disk of
+                   VirtualHardDisk -> liftIO . doesFileExist $ diskPath disk
+                   _               -> return True
+     _       -> return True
 
 --build an xl config style disk list
 diskSpecs :: VmConfig -> Rpc [DiskSpec]
@@ -596,8 +601,8 @@ diskSpecs cfg = do
 diskSpec :: Uuid -> Disk -> Rpc DiskSpec
 diskSpec uuid d  = do
   stubdom <- readConfigPropertyDef uuid vmStubdom False
-  return $ printf "'%s,%s,%s,%s,%s,backend=%s,%s'"
-             (diskPath d) (fileToRaw (enumMarshall $ diskType d)) (cdType stubdom d) (diskDevice d) (enumMarshall $ diskMode d) (fromMaybe "0" (diskBackendName d)) (if ((enumMarshall $ diskDeviceType d) == "cdrom") then (enumMarshall $ diskDeviceType d) else "")
+  return $ printf "'%s,%s,%s,%s,%s,backend=%d,%s'"
+             (diskPath d) (fileToRaw (enumMarshall $ diskType d)) (cdType stubdom d) (diskDevice d) (enumMarshall $ diskMode d) (fromMaybe 0 (diskBackendDomid d)) (if ((enumMarshall $ diskDeviceType d) == "cdrom") then (enumMarshall $ diskDeviceType d) else "")
   where
     cdType stubdom d =
       case (enumMarshall $ diskDeviceType d) of

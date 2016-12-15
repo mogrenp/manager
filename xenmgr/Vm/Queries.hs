@@ -33,6 +33,7 @@ module Vm.Queries
                , getRunningHDX
                , getGraphicsFallbackVm
                , getDefaultNetworkBackendVm
+               , getDefaultDiskBackendVm
                , getConfigCorruptionInfo
                , getNic
                , getVmNicDefs
@@ -109,6 +110,7 @@ module Vm.Queries
                , getVmOvfTransportIso
                , getVmDownloadProgress
                , getVmReady
+               , getVmProvidesDefaultDiskBackend
                , getVmProvidesDefaultNetworkBackend
                , getVmVkbd
                , getVmVfb
@@ -199,9 +201,15 @@ whenVmRunning uuid f = go =<< isRunning uuid
     where go True = f
           go _    = return ()
 
--- iterate over configured devices and plug proper backend domid
 plugBackendDomains :: VmConfig -> Rpc VmConfig
 plugBackendDomains cfg =
+    do cfg_post_net <- plugNetworkBackendDomains cfg
+       cfg_post_disk <- plugDiskBackendDomains cfg_post_net
+       return cfg_post_disk
+
+-- iterate over configured devices and plug proper backend domid
+plugNetworkBackendDomains :: VmConfig -> Rpc VmConfig
+plugNetworkBackendDomains cfg =
     do plugged <- mapM plugNic (vmcfgNics cfg)
        return $ cfg { vmcfgNics = plugged }
   where
@@ -214,6 +222,19 @@ plugBackendDomains cfg =
           backendFromUuid nic (Just uuid) = do
             domid <- getDomainID uuid
             return $ nic { nicdefBackendDomid = domid }
+
+plugDiskBackendDomains :: VmConfig -> Rpc VmConfig
+plugDiskBackendDomains cfg =
+    do plugged <- mapM (plugDisk (vmcfgUuid cfg)) (vmcfgDisks cfg)
+       return $ cfg { vmcfgDisks = plugged }
+  where
+    plugDisk :: Uuid -> Disk -> Rpc Disk
+    plugDisk uuid disk = backendFromUuid disk =<< getVmDiskBackendUuid uuid disk
+        where
+          backendFromUuid disk Nothing = return disk
+          backendFromUuid disk (Just uuid) = do
+            domid <- getDomainID uuid
+            return $ disk { diskBackendDomid = domid }
 
 getMaxVgpus :: Rpc Int
 getMaxVgpus = vgpu <$> querySurfmanVgpuMode
@@ -338,8 +359,10 @@ getVmStartupDisks uuid = do
            , diskSnapshotMode = Nothing
            , diskSha1Sum = Nothing
            , diskShared = False
-           , diskManagedType = UnmanagedDisk 
-           , diskBackendName = Nothing 
+           , diskManagedType = UnmanagedDisk
+           , diskBackendName = Nothing
+           , diskBackendUuid = Nothing
+           , diskBackendDomid = Nothing
            }
       
 getVms :: (MonadRpc e m) => m [Uuid]
@@ -381,15 +404,25 @@ getAvailableVmNetworks nics
          let nic_networks = map nicdefNetwork (filter nicdefEnable nics)
          catMaybes <$> (mapM statNetwork $ intersect all_networks nic_networks)
 
-getVmDiskBackendUuid :: Disk -> Rpc (Maybe Uuid)
-getVmDiskBackendUuid disk =
-     case diskBackendName disk of
-          Nothing   -> return Nothing
-          Just name ->
-            do vms <- getVmsBy (\vm -> (== name) <$> getVmName vm)
-               case vms of
-                 (uuid:_) -> return $ Just uuid
-                 _        -> return Nothing
+getDefaultDiskBackendVm :: Rpc (Maybe Uuid)
+getDefaultDiskBackendVm = do
+  vms <- getVmsBy getVmProvidesDefaultDiskBackend
+--  if null vms then return Nothing else return $ Just vms
+  case vms of
+     (uuid:_) -> return $ Just uuid
+     _        -> return Nothing
+
+getVmDiskBackendUuid :: Uuid -> Disk -> Rpc (Maybe Uuid)
+getVmDiskBackendUuid uuid disk = do
+   default_backend <- liftRpc getDefaultDiskBackendVm
+   case (diskBackendUuid disk, diskBackendName disk) of
+      (Nothing  , Nothing)   -> if uuid == (fromMaybe domain0uuid default_backend) then return Nothing else return default_backend
+      (Just uuid, _      )   -> return $ Just uuid
+      (Nothing  , Just name) ->
+         do vms <- getVmsBy (\vm -> (== name) <$> getVmName vm)
+            case vms of
+               (uuid:_) -> return $ Just uuid
+               _        -> return Nothing
 
 getDiskDependencyGraph :: Rpc (DepGraph Uuid)
 getDiskDependencyGraph =
@@ -399,14 +432,14 @@ getDiskDependencyGraph =
     where
       edge uuid =
           do disks <- M.elems <$> getDisks uuid
-             backends <- nub . catMaybes <$> mapM getVmDiskBackendUuid disks
+             backends <- nub . catMaybes <$> mapM (getVmDiskBackendUuid uuid) disks
              return $ map (\dep -> (uuid,dep)) backends
 
 getVmDiskDependencies :: Uuid -> Rpc [Uuid]
 getVmDiskDependencies uuid =
     do graph <- getDiskDependencyGraph
        case dependencies uuid graph of
-         Nothing -> error "errors in dependency graph; check for cycles"
+         Nothing -> error "errors in disk dependency graph; check for cycles"
          Just xs -> return xs
 
 getNetworkDependencyGraph :: Rpc (DepGraph Uuid)
@@ -424,7 +457,7 @@ getVmNetworkDependencies :: Uuid -> Rpc [Uuid]
 getVmNetworkDependencies uuid =
     do graph <- getNetworkDependencyGraph
        case dependencies uuid graph of
-         Nothing -> error "errors in dependency graph; check for cycles"
+         Nothing -> error "errors in network dependency graph; check for cycles"
          Just xs -> return xs
 
 getFullDependencyGraph :: Rpc (DepGraph Uuid)
@@ -437,7 +470,7 @@ getFullDependencyGraph =
           do nics <- getVmNicDefs' uuid
              disks <- M.elems <$> getDisks uuid
              net_backends <- nub . catMaybes <$> mapM getVmNicBackendUuid nics
-             disk_backends <- nub . catMaybes <$> mapM getVmDiskBackendUuid disks
+             disk_backends <- nub . catMaybes <$> mapM (getVmDiskBackendUuid uuid) disks
              return $ map (\dep -> (uuid,dep)) (net_backends ++ disk_backends)
 
 getVmDependencies :: Uuid -> Rpc [Uuid]
@@ -1010,6 +1043,7 @@ getVmDescription uuid = readConfigPropertyDef uuid vmDescription ""
 getVmStartOnBootPriority uuid = readConfigPropertyDef uuid vmStartOnBootPriority (0::Int)
 getVmKeepAlive uuid = readConfigPropertyDef uuid vmKeepAlive False
 getVmProvidesDiskBackend uuid = readConfigPropertyDef uuid vmProvidesDiskBackend False
+getVmProvidesDefaultDiskBackend uuid = readConfigPropertyDef uuid vmProvidesDefaultDiskBackend False
 getVmProvidesNetworkBackend uuid = readConfigPropertyDef uuid vmProvidesNetworkBackend False
 getVmProvidesDefaultNetworkBackend uuid = readConfigPropertyDef uuid vmProvidesDefaultNetworkBackend False
 getVmMeasured uuid = readConfigPropertyDef uuid vmMeasured False

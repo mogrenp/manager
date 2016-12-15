@@ -112,6 +112,8 @@ data Disk = Disk { diskPath :: FilePath
                  , diskEnabled :: Bool
                  , diskManagedType :: ManagedDiskType
                  , diskBackendName :: Maybe String
+                 , diskBackendUuid :: Maybe Uuid
+                 , diskBackendDomid :: Maybe DomainID
                  } deriving (Eq, Show)
 
 type Sha1Sum = Integer
