@@ -245,7 +245,7 @@ periodics xm_context rpccontext =
         ]
 
     checkStorage = do
-      rpc rpccontext hostCheckFreeStorage
+      --rpc rpccontext hostCheckFreeStorage
       return ()
 
 hostMonitorIdleness :: XmContext -> Rpc ()
