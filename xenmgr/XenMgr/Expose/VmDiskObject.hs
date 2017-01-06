@@ -121,10 +121,9 @@ _GetBackendUuid :: ID -> Rpc String
 _GetBackendUuid id = fromMaybe "" . fmap show  <$> _get_field id diskBackendUuid
 
 _SetBackendUuid :: ID -> String -> Vm ()
-_SetBackendUuid id uuid = _modify_disk id $ \d -> d { diskBackendName = case uuid of
-                                                                         "" -> Nothing
-                                                                         _  -> Just uuid }
-
+_SetBackendUuid id uuid = _modify_disk id $ \d -> d { diskBackendUuid = case uuid of
+                                                                           "" -> Nothing
+                                                                           _  -> Just (fromString uuid) }
 _GetBackendName :: ID -> Rpc String
 _GetBackendName id = fromMaybe "" . fmap show  <$> _get_field id diskBackendName
 
