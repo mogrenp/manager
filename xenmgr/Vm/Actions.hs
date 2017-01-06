@@ -1621,10 +1621,11 @@ copyKernelFromDisk extraEnv uuid disk dst_path src = do
        liftIO $ copyFileFromDisk extraEnv (diskType disk) (diskMode disk == ReadOnly) (diskPath disk) src dst_path
     else do
        backend_domid <- getDomainID (fromMaybe domain0uuid backend_uuid)
+       liftIO $ system ("echo xl -vvvvvvv block-attach 0 " ++ show (enumMarshall $ diskType disk) ++ ":" ++ show (diskPath disk) ++ " xvdc r backend=" ++ show (fromMaybe 0 backend_domid))
        exitCode <- liftIO $ system ("xl -vvvvvvv block-attach 0 " ++ show (enumMarshall $ diskType disk) ++ ":" ++ show (diskPath disk) ++ " xvdc r backend=" ++ show (fromMaybe 0 backend_domid))
        case exitCode of
           ExitSuccess -> liftIO $ copyFileFromDisk extraEnv (DiskImage) (True) ("/dev/xvdc") src dst_path
-          _           -> error $ "Could not attach disk from domain " ++ show backend_domid ++ " to dom0 for file extraction"
+          _           -> error $ "Could not attach disk from domain " ++ show (fromMaybe 0 backend_domid) ++ " to dom0 for file extraction"
        exitCode <- liftIO $ system ("xl block-detach 0 xvdc")
        return ()
 
