@@ -1606,12 +1606,27 @@ extractFileFromPvDomain (Just dst_path) ext_loc uuid = withKernelPath dst_path w
          (_, "") -> return () -- doesn't have a kernel, not a pv domain, ignore
          (Nothing, _) -> error "extract-kernel: domain does not have a disk with ID 0"
          (_, path) | null src_path -> return () -- no extraction
-         (Just disk, path) -> do liftIO $ copyKernelFromDisk [("TAPDISK2_CRYPTO_KEYDIR", keydirs)] disk path (partid,src_path)
+         (Just disk, path) -> do copyKernelFromDisk [("TAPDISK2_CRYPTO_KEYDIR", keydirs)] uuid disk path (partid,src_path)
                                  info $ "extracted pv kernel/initrd from " ++ src_path ++ " into " ++ path
 
-copyKernelFromDisk :: [ (String, String) ] -> Disk -> FilePath -> (Maybe PartitionNum,FilePath) -> IO ()
-copyKernelFromDisk extraEnv disk dst_path src
- = copyFileFromDisk extraEnv (diskType disk) (diskMode disk == ReadOnly) (diskPath disk) src dst_path
+--copyKernelFromDisk :: [ (String, String) ] -> Disk -> FilePath -> (Maybe PartitionNum,FilePath) -> IO ()
+--copyKernelFromDisk extraEnv disk dst_path src
+-- = copyFileFromDisk extraEnv (diskType disk) (diskMode disk == ReadOnly) (diskPath disk) src dst_path
+
+copyKernelFromDisk :: [ (String, String) ] -> Uuid -> Disk -> FilePath -> (Maybe PartitionNum,FilePath) -> Rpc ()
+copyKernelFromDisk extraEnv uuid disk dst_path src = do
+  backend_uuid <- liftRpc $ getVmDiskBackendUuid uuid disk
+  if (backend_uuid == Nothing)
+    then do
+       liftIO $ copyFileFromDisk extraEnv (diskType disk) (diskMode disk == ReadOnly) (diskPath disk) src dst_path
+    else do
+       backend_domid <- getDomainID (fromMaybe domain0uuid backend_uuid)
+       exitCode <- liftIO $ system ("xl -vvvvvvv block-attach 0 " ++ show (enumMarshall $ diskType disk) ++ ":" ++ show (diskPath disk) ++ " xvdc r backend=" ++ show (fromMaybe 0 backend_domid))
+       case exitCode of
+          ExitSuccess -> liftIO $ copyFileFromDisk extraEnv (DiskImage) (True) ("/dev/xvdc") src dst_path
+          _           -> error $ "Could not attach disk from domain " ++ show backend_domid ++ " to dom0 for file extraction"
+       exitCode <- liftIO $ system ("xl block-detach 0 xvdc")
+       return ()
 
 changeVmNicNetwork :: Uuid -> NicID -> Network -> XM ()
 changeVmNicNetwork uuid nicid network = do
